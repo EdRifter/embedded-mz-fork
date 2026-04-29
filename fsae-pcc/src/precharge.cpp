@@ -30,7 +30,8 @@ constexpr double THERMISTOR_TEMPERATURE_THRESHOLD_C = 69;
 PrechargeState state = STATE_STANDBY;
 PrechargeState lastState = STATE_UNDEFINED;
 int errorCode = ERR_NONE;
-
+static PCC pccData = {0};
+static Temp tempData = {0};
 // Voltage measurements
 
 // Low pass filter
@@ -154,8 +155,21 @@ void prechargeTask(void *pvParameters) {
         // taskEXIT_CRITICAL(); // Exit critical section
 
         // Send CAN message of current PCC state
-        CAN_SendPCCMessage(state, errorCode, pcData.accVoltage,
-                           pcData.tsVoltage, pcData.prechargeProgress);
+        pccData = {
+            .state = (uint8_t)state,
+            .errorCode = (uint8_t)errorCode,
+            .accumulatorVoltage = uint16_t(pcData.accVoltage * 100),
+            .tsVoltage = uint16_t(pcData.tsVoltage * 100),
+            .prechargeProgress = uint16_t(pcData.prechargeProgress),
+        };
+
+        canSendMessage(PCC_CAN_ID, &pccData, sizeof(PCC));
+
+        // Send CAN message of thermistor state
+        canSendMessage(TEMP_CAN_ID, &tempData, sizeof(Temp));
+
+        pccData = {0};
+        tempData = {0};
         // CAN_SendPCCMessage(STATE_DISCHARGE, errorCode, 10.0F, 20.0F, 50.0F);
 
         // Wait for next cycle
@@ -419,6 +433,14 @@ bool checkSafeTemperature() {
     double T1Temp = temperatureFromADC(T1ADC);
     double T2Temp = temperatureFromADC(T2ADC);
 
-    return (T1Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C &&
-            T2Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C);
+    tempData.T1Temp = (int16_t)(T1Temp);
+    tempData.T2Temp = (int16_t)(T2Temp);
+
+    if (T1Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C &&
+        T2Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C) {
+        tempData.safeToCharge = 1;
+    } else {
+        tempData.safeToCharge = 0;
+    }
+    return (tempData.safeToCharge);
 }
