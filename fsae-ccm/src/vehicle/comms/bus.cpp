@@ -19,8 +19,9 @@ static dtiData2 dtiExtra;
 static OrionBMSData bmsData;
 static IMDData imdData;
 
-static TickType_t canLatestHealthyStateTime = 0;
+TickType_t canLatestHealthyStateTime = 0;
 static uint32_t canAgeMs = 0;
+
 
 void Bus_Init() {
 
@@ -107,10 +108,7 @@ void threadBus(void *pvParameters) {
         can_last_run_tick = xTaskGetTickCount(); // update WDT tick
 
         // Read the CAN messages
-        if (CAN_Receive(&rx_id, &rx_data)) {
-            canLatestHealthyStateTime = xTaskGetTickCount();
-            // update healthy state time on successful CAN
-        }
+        CAN_Receive(&rx_id, &rx_data);
         canAgeMs = (can_last_run_tick - canLatestHealthyStateTime) *
                    portTICK_PERIOD_MS;
         if (canAgeMs > CAN_FAULT_TIME_THRESHOLD_MS) { // 100 ms
