@@ -22,7 +22,6 @@ static IMDData imdData;
 TickType_t canLatestHealthyStateTime = 0;
 static uint32_t canAgeMs = 0;
 
-
 void Bus_Init() {
 
     dtiData = {.controlMode = 0,
@@ -116,7 +115,6 @@ void threadBus(void *pvParameters) {
         } else {
             Faults_ClearFault(FAULT_CAN);
         }
-
         // TODO ADD SHIFT  >> by 8 here will ONLY work for DTI.. maybe not.
         // distinguish case for all in same loop??
         switch ((rx_id >> 8)) {
