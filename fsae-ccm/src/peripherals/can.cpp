@@ -16,7 +16,6 @@
 #include "vehicle/devices/dti.h"
 #include "vehicle/vcu.h"
 
-
 #define CAN_INSTANCE CAN1 // can be removed
 #define CAN_BAUD_RATE 500000
 
