@@ -17,14 +17,13 @@ typedef struct __attribute__((packed)) {
     uint16_t accumulatorVoltage; // Accumulator voltage in volts
     uint16_t tsVoltage;          // Transmission side voltage in volts
     uint16_t prechargeProgress;  // Precharge progress in percent
-    // uint8_t isSafeTemperature;   // Precharge temperature ok check
-} PCC;
+} PCCData;
 
 typedef struct __attribute__((packed)) {
     int16_t T1Temp; // Thermistor 1 Temperature
     int16_t T2Temp; // Thermistor 2 Temperature
-    uint8_t safeToCharge : 1;
-} Temp;
+    uint8_t isSafeTemperature : 0;
+} PCCTempData;
 
 void CAN_Init();
 

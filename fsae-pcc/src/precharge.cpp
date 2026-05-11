@@ -30,8 +30,8 @@ constexpr double THERMISTOR_TEMPERATURE_THRESHOLD_C = 69;
 PrechargeState state = STATE_STANDBY;
 PrechargeState lastState = STATE_UNDEFINED;
 int errorCode = ERR_NONE;
-static PCC pccData = {0};
-static Temp tempData = {0};
+static PCCData pccData{};
+static PCCTempData tempData{};
 // Voltage measurements
 
 // Low pass filter
@@ -64,8 +64,8 @@ void prechargeInit() {
     pcData.accVoltage = 0.0F;  // Initialize filtered tractive system frequency
     pcData.tsVoltage = 0.0F;   // Initialize filtered accumulator frequency
     pcData.prechargeProgress = 0.0F; // Initialize accumulator voltage
-    pcData.isSafeTemperature =
-        false; // Initialize temperature check flag to false
+
+    tempData.isSafeTemperature = false;
 
     // Create precharge task
     xTaskCreate(prechargeTask, "PrechargeTask", PRECHARGE_STACK_SIZE, NULL,
@@ -84,6 +84,10 @@ void prechargeTask(void *pvParameters) {
         // Check thermistor readings, discharge if exceeded
         if (!checkSafeTemperature()) {
             state = STATE_DISCHARGE;
+        }
+        else {
+            // Update temperature CAN flag
+            tempData.isSafeTemperature = true;
         }
 
         updateVoltage(ACCUMULATOR_VOLTAGE_PIN); // Get raw accumulator voltage
@@ -168,8 +172,7 @@ void prechargeTask(void *pvParameters) {
         // Send CAN message of thermistor state
         canSendMessage(TEMP_CAN_ID, &tempData, sizeof(Temp));
 
-        pccData = {0};
-        tempData = {0};
+
         // CAN_SendPCCMessage(STATE_DISCHARGE, errorCode, 10.0F, 20.0F, 50.0F);
 
         // Wait for next cycle
@@ -438,9 +441,9 @@ bool checkSafeTemperature() {
 
     if (T1Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C &&
         T2Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C) {
-        tempData.safeToCharge = 1;
-    } else {
-        tempData.safeToCharge = 0;
+        tempData.isSafeTemperature = 1;
+        return 1;
     }
-    return (tempData.safeToCharge);
+    tempData.isSafeTemperature = 0;
+    return 0;
 }
