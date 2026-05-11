@@ -167,10 +167,10 @@ void prechargeTask(void *pvParameters) {
             .prechargeProgress = uint16_t(pcData.prechargeProgress),
         };
 
-        canSendMessage(PCC_CAN_ID, &pccData, sizeof(PCC));
+        canSendMessage(PCC_CAN_ID, &pccData, sizeof(PCCData));
 
         // Send CAN message of thermistor state
-        canSendMessage(TEMP_CAN_ID, &tempData, sizeof(Temp));
+        canSendMessage(TEMP_CAN_ID, &tempData, sizeof(PCCTempData));
 
 
         // CAN_SendPCCMessage(STATE_DISCHARGE, errorCode, 10.0F, 20.0F, 50.0F);

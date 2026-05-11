@@ -22,7 +22,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     int16_t T1Temp; // Thermistor 1 Temperature
     int16_t T2Temp; // Thermistor 2 Temperature
-    uint8_t isSafeTemperature : 0;
+    uint8_t isSafeTemperature : 1;
 } PCCTempData;
 
 void CAN_Init();
