@@ -84,8 +84,7 @@ void prechargeTask(void *pvParameters) {
         // Check thermistor readings, discharge if exceeded
         if (!checkSafeTemperature()) {
             state = STATE_DISCHARGE;
-        }
-        else {
+        } else {
             // Update temperature CAN flag
             tempData.isSafeTemperature = true;
         }
@@ -171,7 +170,6 @@ void prechargeTask(void *pvParameters) {
 
         // Send CAN message of thermistor state
         canSendMessage(TEMP_CAN_ID, &tempData, sizeof(PCCTempData));
-
 
         // CAN_SendPCCMessage(STATE_DISCHARGE, errorCode, 10.0F, 20.0F, 50.0F);
 
