@@ -9,16 +9,29 @@
 #include "semphr.h"
 #include "utils.h"
 
+#include <cmath>
+
 #define PRECHARGE_STACK_SIZE 512U
 #define PRECHARGE_PRIORITY 8
 
 #define TIME_HYSTERESIS_MS 20U
 
+constexpr double THERMISTOR1_PIN = 7;
+constexpr double THERMISTOR2_PIN = 8;
+constexpr double THERMISTOR_T0_C = 25;
+constexpr double THERMISTOR_R0 = 10000;
+constexpr double THERMISTOR_BETA = 3880;
+constexpr double THERMISTOR_DIVIDER_RESISTOR = 6800;
+constexpr int TEENSY_ADC_RESOLUTION_BITS = 12;
+
+constexpr double THERMISTOR_TEMPERATURE_THRESHOLD_C = 69;
+
 // States (Global Variables)
 PrechargeState state = STATE_STANDBY;
 PrechargeState lastState = STATE_UNDEFINED;
 int errorCode = ERR_NONE;
-
+static PCCData pccData{};
+static PCCTempData tempData{};
 // Voltage measurements
 
 // Low pass filter
@@ -28,6 +41,7 @@ typedef struct {
     float accVoltage;
     float tsVoltage;
     float prechargeProgress;
+    bool isSafeTemperature;
 } PrechargeData;
 
 static PrechargeData pcData;
@@ -38,6 +52,7 @@ static void updateVoltage(int pin);
 static void standby();
 static void precharge();
 static void running();
+static void charging();
 static void errorState();
 
 // Initialize mutex and precharge task
@@ -49,6 +64,8 @@ void prechargeInit() {
     pcData.accVoltage = 0.0F;  // Initialize filtered tractive system frequency
     pcData.tsVoltage = 0.0F;   // Initialize filtered accumulator frequency
     pcData.prechargeProgress = 0.0F; // Initialize accumulator voltage
+
+    tempData.isSafeTemperature = false;
 
     // Create precharge task
     xTaskCreate(prechargeTask, "PrechargeTask", PRECHARGE_STACK_SIZE, NULL,
@@ -64,6 +81,14 @@ void prechargeTask(void *pvParameters) {
     xLastWakeTime = xTaskGetTickCount();
 
     while (true) {
+        // Check thermistor readings, discharge if exceeded
+        if (!checkSafeTemperature()) {
+            state = STATE_DISCHARGE;
+        } else {
+            // Update temperature CAN flag
+            tempData.isSafeTemperature = true;
+        }
+
         updateVoltage(ACCUMULATOR_VOLTAGE_PIN); // Get raw accumulator voltage
         updateVoltage(TS_VOLTAGE_PIN); // Get raw tractive system voltage
 
@@ -90,7 +115,29 @@ void prechargeTask(void *pvParameters) {
             if (pcData.accVoltage < PCC_MIN_ACC_VOLTAGE) {
                 state = STATE_DISCHARGE;
             }
+            if (CAN_IsChargerSafetyActive()) {
+                state = STATE_CHARGING;
+                break;
+            }
             running();
+            break;
+        }
+        case STATE_CHARGING: {
+            if (pcData.accVoltage < PCC_MIN_ACC_VOLTAGE) {
+                state = STATE_DISCHARGE;
+                break;
+            }
+            if (!CAN_IsChargerSafetyActive()) {
+                state = STATE_STANDBY;
+                break;
+            }
+            if ((xTaskGetTickCount() - CAN_GetBMSLastRxTime()) >
+                pdMS_TO_TICKS(BMS_CAN_TIMEOUT_MS)) {
+                state = STATE_ERROR;
+                errorCode |= ERR_BMS_CAN_TIMEOUT;
+                break;
+            }
+            charging();
             break;
         }
         case STATE_ERROR: {
@@ -111,8 +158,19 @@ void prechargeTask(void *pvParameters) {
         // taskEXIT_CRITICAL(); // Exit critical section
 
         // Send CAN message of current PCC state
-        CAN_SendPCCMessage(state, errorCode, pcData.accVoltage,
-                           pcData.tsVoltage, pcData.prechargeProgress);
+        pccData = {
+            .state = (uint8_t)state,
+            .errorCode = (uint8_t)errorCode,
+            .accumulatorVoltage = uint16_t(pcData.accVoltage * 100),
+            .tsVoltage = uint16_t(pcData.tsVoltage * 100),
+            .prechargeProgress = uint16_t(pcData.prechargeProgress),
+        };
+
+        canSendMessage(PCC_CAN_ID, &pccData, sizeof(PCCData));
+
+        // Send CAN message of thermistor state
+        canSendMessage(TEMP_CAN_ID, &tempData, sizeof(PCCTempData));
+
         // CAN_SendPCCMessage(STATE_DISCHARGE, errorCode, 10.0F, 20.0F, 50.0F);
 
         // Wait for next cycle
@@ -164,6 +222,10 @@ void standby() {
         lastState = STATE_STANDBY;
         state = STATE_PRECHARGE;
     }
+    if (CAN_IsChargerSafetyActive()) {
+        lastState = STATE_STANDBY;
+        state = STATE_PRECHARGE;
+    }
 }
 
 // PRECHARGE STATE: Close AIR- and precharge relay, monitor precharge voltage
@@ -209,7 +271,8 @@ void precharge() {
             }
             // Precharge complete
             else {
-                state = STATE_ONLINE;
+                state =
+                    CAN_IsChargerSafetyActive() ? STATE_CHARGING : STATE_ONLINE;
                 Serial.print(" * Precharge complete at: ");
                 Serial.print(now - timePrechargeStart);
                 Serial.print("ms, ");
@@ -250,6 +313,32 @@ void running() {
     digitalWrite(SHUTDOWN_CTRL_PIN, HIGH);
 }
 
+// CHARGING STATE: AIRs closed, print charger data from BMS
+void charging() {
+    // print charger data from BMS
+    if (lastState != STATE_CHARGING) {
+        lastState = STATE_CHARGING;
+        Serial.println(" === CHARGING");
+    }
+    // close AIRs
+    digitalWrite(SHUTDOWN_CTRL_PIN, HIGH);
+
+    // changed to using ticks instead of milliseconds
+    static TickType_t lastPrint = 0;
+    TickType_t now = xTaskGetTickCount();
+    if ((now - lastPrint) >= pdMS_TO_TICKS(CHARGING_PRINT_INTERVAL_MS)) {
+        lastPrint = now;
+        // print charger data from BMS
+        Serial.print("CHARGING: PackV=");
+        Serial.print(CAN_GetChargerVoltage(), 1);
+        Serial.print("V  CCL=");
+        Serial.print(CAN_GetChargerCCL(), 1);
+        Serial.print("A  Counter=");
+        Serial.print(CAN_GetChargerCounter());
+        Serial.print("\r");
+    }
+}
+
 // ERROR STATE: Indicate error, open AIRs and precharge relay
 void errorState() {
     digitalWrite(SHUTDOWN_CTRL_PIN, LOW);
@@ -270,6 +359,9 @@ void errorState() {
             Serial.println("   *Precharge too slow. Potential causes:\n   - "
                            "Wiring fault\n   - Discharge is stuck-on\n   - "
                            "Target precharge percent is too high");
+        }
+        if (errorCode & ERR_BMS_CAN_TIMEOUT) {
+            Serial.println("   *BMS CAN communication timeout.");
         }
         if (errorCode & ERR_STATE_UNDEFINED) {
             Serial.println("   *State not defined in The State Machine.");
@@ -307,4 +399,49 @@ int getPrechargeError() {
     taskEXIT_CRITICAL(); // Exit critical section
 
     return currentPrechargeError;
+}
+
+// Return the temperature in Celsius based on ADC reading of thermistor.
+double temperatureFromADC(double adc) {
+    // Prevent division by zero etc. by clamping ADC values.
+    if (adc >= (1 << TEENSY_ADC_RESOLUTION_BITS)) {
+        adc = (1 << TEENSY_ADC_RESOLUTION_BITS) - 1.0;
+    }
+    if (adc <= 0) {
+        adc = 1.0;
+    }
+
+    // Temperature in Celsius in terms of ADC value for thermistor
+    double resistorRatio =
+        THERMISTOR_DIVIDER_RESISTOR /
+        (THERMISTOR_R0 *
+         ((static_cast<double>(1 << TEENSY_ADC_RESOLUTION_BITS) - 1.0) / adc -
+          1.0));
+
+    return 1.0 / ((1.0 / (THERMISTOR_T0_C + 273.15)) +
+                  (1.0 / THERMISTOR_BETA) * (std::log(resistorRatio))) -
+           273.15;
+}
+
+// Check thermistor for temperature reading: (Threshold: 69 C)
+bool checkSafeTemperature() {
+    // Read thermistor values, calculate current temperature and return boolean
+    // (Thermistor pins: A8, A9 (22, 23)) Thermistor power voltage: (3.3 V)
+
+    double T1ADC = static_cast<double>(analogRead(THERMISTOR1_PIN));
+    double T2ADC = static_cast<double>(analogRead(THERMISTOR2_PIN));
+
+    double T1Temp = temperatureFromADC(T1ADC);
+    double T2Temp = temperatureFromADC(T2ADC);
+
+    tempData.T1Temp = (int16_t)(T1Temp);
+    tempData.T2Temp = (int16_t)(T2Temp);
+
+    if (T1Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C &&
+        T2Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C) {
+        tempData.isSafeTemperature = 1;
+        return 1;
+    }
+    tempData.isSafeTemperature = 0;
+    return 0;
 }

@@ -28,9 +28,10 @@ operation)
     TODO Fixes:
     BIG MZ Change - INTERUPT BASED CAN Testing:
 */
-#define SERIALMONITOR_FLAG 1
+#define SERIALMONITOR_FLAG 0
 #define DEBUG_FLAG 0
 #define HIMAC_FLAG 0
+#define WSS_FLAG 1
 #define BMS_FLAG 0 // TO REMOVE
 #define IMD_FLAG 0
 
@@ -49,6 +50,8 @@ operation)
 #define THREAD_ADC_PRIORITY 8
 #define THREAD_CP_STACK_SIZE 128
 #define THREAD_CP_PRIORITY 6
+#define THREAD_WDT_STACK_SIZE 128
+#define THREAD_WDT_PRIORITY 9
 
 #define WHEEL_SPEED_1_PIN 2
 #define WHEEL_SPEED_2_PIN 3
@@ -142,6 +145,8 @@ operation)
 #define BSE_FAULT_TIME_THRESHOLD_MS 100
 
 #define BSE_CUTOFF_HZ 100.0F
+
+#define CAN_FAULT_TIME_THRESHOLD_MS 100
 
 #define MOTOR_MAX_TORQUE 260.0F // TODO: Update with real value //used to be 260
 #define CAPPED_MOTOR_TORQUE 80.0F

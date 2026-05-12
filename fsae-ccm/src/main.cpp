@@ -5,6 +5,8 @@
 
 #include "peripherals/adc.h"
 #include "peripherals/can.h"
+#include "peripherals/gpio.h"
+#include "peripherals/wdt.h"
 
 #include "peripherals/gpio.h"
 #include "vehicle/comms/bus.h"
@@ -16,6 +18,7 @@
 #include "vehicle/devices/linpots.h"
 #include "vehicle/devices/rtm.h"
 #include "vehicle/devices/thermal.h"
+#include "vehicle/devices/wss.h"
 #include "vehicle/faults.h"
 #include "vehicle/vcu.h"
 
@@ -45,6 +48,9 @@ void setup() { // runs once on bootup
     PCC_Init();
     thermal_Init();
     Bypass_Init();
+    GPIO_Init();
+    WSS_Init();
+    WDT_Init();
 
     Serial.begin(9600);
 
@@ -59,6 +65,8 @@ void setup() { // runs once on bootup
                 THREAD_CAN_TELEMETRY_PRIORITY, NULL);
     xTaskCreate(threadMain, "threadMain", THREAD_MAIN_STACK_SIZE, NULL,
                 THREAD_MAIN_PRIORITY, NULL);
+    xTaskCreate(threadWDT, "threadWDT", THREAD_WDT_STACK_SIZE, NULL,
+                THREAD_WDT_PRIORITY, NULL);
     vTaskStartScheduler();
 }
 
@@ -77,9 +85,25 @@ void threadMain(void *pvParameters) {
     int toggle = 0;
 #endif
     while (true) {
+        WSS_Update();
+        main_last_run_tick = xTaskGetTickCount(); // update WDT tick
 
         /*============LOW PRIORITY GPIO UPDATES============*/
         digitalWrite(13, HIGH); // orange led on teensy
+
+#if WSS_FLAG
+        Serial.print("W1 RPM: ");
+        Serial.print(WSS_GetRPM1());
+        Serial.print(" | W1 MPH: ");
+        Serial.print(WSS_GetSpeed1_MPH());
+
+        Serial.print(" | W2 RPM: ");
+        Serial.print(WSS_GetRPM2());
+        Serial.print(" | W2 MPH: ");
+        Serial.print(WSS_GetSpeed2_MPH());
+
+        Serial.print("\r");
+#endif
 
         // Bypass_TSSI();
         // thermal_regulate(); //still need to tune parameters
@@ -356,6 +380,7 @@ void threadMain(void *pvParameters) {
             enableStandby); // Update motor with the current torque demand
 
 #endif
+
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(100)); // Delay for 100ms
     }
 }
