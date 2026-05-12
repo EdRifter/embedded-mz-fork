@@ -3,10 +3,8 @@
 ```mermaid
 flowchart TD
     BMS(Orion BMS) -->|CAN| RASPI
-    IMS(Elcon Charger) <-->|CAN| BMS
-    IMS(Elcon Charger) -->|CAN| RASPI
-    IMU(MPU6050 IMU) -->|I2C| RASPI
-    GPS(NEO-6M GPS) -->|UART| RASPI
+    IMS(Valeo Charger) <-->|CAN| BMS
+    IMS(Valeo Charger) -->|CAN| RASPI
 
     B([Brake Sensors]) -->|Analog| TS-CCM
     L([Linear Potentiometers]) -->|Analog| TS-CCM
