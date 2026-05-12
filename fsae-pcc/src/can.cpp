@@ -9,7 +9,6 @@
 #include <arduino_freertos.h>
 
 #define CAN_BAUDRATE 500000
-#define PCC_CAN_ID 0x222
 // #define PCC_CAN_ID 0x123
 
 // charger can ids
@@ -19,17 +18,6 @@
 #define CHARGER_SAFETY_BYTE 6
 // charger safety mask
 constexpr uint8_t CHARGER_SAFETY_MASK = 0x08;
-
-typedef struct __attribute__((packed)) {
-    uint8_t state;               // Precharge state
-    uint8_t errorCode;           // Error code
-    uint16_t accumulatorVoltage; // Accumulator voltage in volts
-    uint16_t tsVoltage;          // Transmission side voltage in volts
-    uint16_t prechargeProgress;  // Precharge progress in percent
-    // uint8_t isSafeTemperature;   // Precharge temperature ok check
-} PCC;
-
-static PCC pccData;
 
 // struct for charger data
 typedef struct {
@@ -44,8 +32,8 @@ typedef struct {
 static ChargerData chargerData;
 
 FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> can2;
-static CAN_message_t pccMsg;
 
+static CAN_message_t canMsg;
 // dedicated task: drains the CAN rx fifo independent of the precharge loop
 static void canTask(void *pvParameters);
 
@@ -67,6 +55,16 @@ void CAN_Init() {
                 THREAD_CAN_PRIORITY, NULL);
 }
 
+void canSendMessage(uint32_t id, const void *data, uint8_t length) {
+    canMsg.id = id;
+    // required to prevent reading garbage values as struct can be smaller than
+    // 8 bytes
+    canMsg.len = length;
+    memcpy(canMsg.buf, data, length);
+    can2.write(canMsg);
+}
+
+/*
 void CAN_SendPCCMessage(uint8_t state, uint8_t errorCode,
                         float accumulatorVoltage, float tsVoltage,
                         float prechargeProgress) {
@@ -95,6 +93,7 @@ void CAN_SendPCCMessage(uint8_t state, uint8_t errorCode,
     // Serial.print(pccData.prechargeProgress);
     // Serial.print('\n');
 }
+*/
 
 static void pollMessages() {
     CAN_message_t rxMsg;

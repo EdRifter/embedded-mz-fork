@@ -30,7 +30,8 @@ constexpr double THERMISTOR_TEMPERATURE_THRESHOLD_C = 69;
 PrechargeState state = STATE_STANDBY;
 PrechargeState lastState = STATE_UNDEFINED;
 int errorCode = ERR_NONE;
-
+static PCCData pccData{};
+static PCCTempData tempData{};
 // Voltage measurements
 
 // Low pass filter
@@ -63,8 +64,8 @@ void prechargeInit() {
     pcData.accVoltage = 0.0F;  // Initialize filtered tractive system frequency
     pcData.tsVoltage = 0.0F;   // Initialize filtered accumulator frequency
     pcData.prechargeProgress = 0.0F; // Initialize accumulator voltage
-    pcData.isSafeTemperature =
-        false; // Initialize temperature check flag to false
+
+    tempData.isSafeTemperature = false;
 
     // Create precharge task
     xTaskCreate(prechargeTask, "PrechargeTask", PRECHARGE_STACK_SIZE, NULL,
@@ -83,6 +84,9 @@ void prechargeTask(void *pvParameters) {
         // Check thermistor readings, discharge if exceeded
         if (!checkSafeTemperature()) {
             state = STATE_DISCHARGE;
+        } else {
+            // Update temperature CAN flag
+            tempData.isSafeTemperature = true;
         }
 
         updateVoltage(ACCUMULATOR_VOLTAGE_PIN); // Get raw accumulator voltage
@@ -154,8 +158,19 @@ void prechargeTask(void *pvParameters) {
         // taskEXIT_CRITICAL(); // Exit critical section
 
         // Send CAN message of current PCC state
-        CAN_SendPCCMessage(state, errorCode, pcData.accVoltage,
-                           pcData.tsVoltage, pcData.prechargeProgress);
+        pccData = {
+            .state = (uint8_t)state,
+            .errorCode = (uint8_t)errorCode,
+            .accumulatorVoltage = uint16_t(pcData.accVoltage * 100),
+            .tsVoltage = uint16_t(pcData.tsVoltage * 100),
+            .prechargeProgress = uint16_t(pcData.prechargeProgress),
+        };
+
+        canSendMessage(PCC_CAN_ID, &pccData, sizeof(PCCData));
+
+        // Send CAN message of thermistor state
+        canSendMessage(TEMP_CAN_ID, &tempData, sizeof(PCCTempData));
+
         // CAN_SendPCCMessage(STATE_DISCHARGE, errorCode, 10.0F, 20.0F, 50.0F);
 
         // Wait for next cycle
@@ -419,6 +434,14 @@ bool checkSafeTemperature() {
     double T1Temp = temperatureFromADC(T1ADC);
     double T2Temp = temperatureFromADC(T2ADC);
 
-    return (T1Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C &&
-            T2Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C);
+    tempData.T1Temp = (int16_t)(T1Temp);
+    tempData.T2Temp = (int16_t)(T2Temp);
+
+    if (T1Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C &&
+        T2Temp < THERMISTOR_TEMPERATURE_THRESHOLD_C) {
+        tempData.isSafeTemperature = 1;
+        return 1;
+    }
+    tempData.isSafeTemperature = 0;
+    return 0;
 }
