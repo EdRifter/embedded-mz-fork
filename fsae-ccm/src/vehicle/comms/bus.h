@@ -1,6 +1,9 @@
 #pragma once
 
+#include "arduino_freertos.h"
 #include <stdint.h>
+
+extern TickType_t canLatestHealthyStateTime;
 
 // similar to ifl.h where can structs, msgs ids, and pointer functions are
 // defined.

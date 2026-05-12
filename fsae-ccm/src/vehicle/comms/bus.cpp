@@ -2,12 +2,12 @@
 
 #include "bus.h"
 #include "arduino_freertos.h"
+#include "imd.h"
 #include "pcc.h"
 #include "peripherals/can.h"
+#include "peripherals/wdt.h"
+#include "telemetry.h"
 #include "utils/utils.h"
-#include "vehicle/comms/bus.h"
-#include "vehicle/comms/imd.h"
-#include "vehicle/comms/telemetry.h"
 
 static TickType_t xLastWakeTime;
 static uint32_t rx_id;
@@ -18,6 +18,9 @@ static dtiData2 dtiExtra;
 
 static OrionBMSData bmsData;
 static IMDData imdData;
+
+TickType_t canLatestHealthyStateTime = 0;
+static uint32_t canAgeMs = 0;
 
 void Bus_Init() {
 
@@ -101,8 +104,17 @@ void threadBus(void *pvParameters) {
     xLastWakeTime = xTaskGetTickCount();
 
     while (true) {
+        can_last_run_tick = xTaskGetTickCount(); // update WDT tick
+
         // Read the CAN messages
         CAN_Receive(&rx_id, &rx_data);
+        canAgeMs = (can_last_run_tick - canLatestHealthyStateTime) *
+                   portTICK_PERIOD_MS;
+        if (canAgeMs > CAN_FAULT_TIME_THRESHOLD_MS) { // 100 ms
+            Faults_SetFault(FAULT_CAN);
+        } else {
+            Faults_ClearFault(FAULT_CAN);
+        }
         // TODO ADD SHIFT  >> by 8 here will ONLY work for DTI.. maybe not.
         // distinguish case for all in same loop??
         switch ((rx_id >> 8)) {
