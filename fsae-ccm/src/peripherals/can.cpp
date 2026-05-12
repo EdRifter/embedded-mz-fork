@@ -11,6 +11,7 @@
 
 #include "peripherals/can.h"
 #include "utils/utils.h"
+#include "vehicle/comms/bus.h"
 #include "vehicle/comms/telemetry.h"
 #include "vehicle/devices/dti.h"
 #include "vehicle/vcu.h"
@@ -91,7 +92,9 @@ void CAN_Receive(uint32_t *rx_id, uint64_t *rx_data) {
     if (can3.read(rx_msg) || can2.read(rx_msg)) {
         *rx_id = rx_msg.id;
         memcpy(rx_data, rx_msg.buf, sizeof(*rx_data));
-    } else { // No message received, assign default values
+        canLatestHealthyStateTime =
+            xTaskGetTickCount(); // update time for successful CAN
+    } else {                     // No message received, assign default values
         *rx_id = 0;
         *rx_data = 0;
     }
