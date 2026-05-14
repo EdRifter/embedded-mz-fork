@@ -45,7 +45,7 @@ typedef struct {
     } PIDState;
 // To use this PID controller for a different application, create a PID state and follow the comments
 // explaining which lines are necissary for a general PID controller and which are specific to this application.
-float computePID(PIDState state, float setPoint, float input, float propGain, float integralGain, float derivativeGain);
+float computePID(PIDState* state, float setPoint, float input, float propGain, float integralGain, float derivativeGain);
 
 /*thermistor based update*/
 void thermal_Update(uint32_t rawReading1, uint32_t rawReading2,
