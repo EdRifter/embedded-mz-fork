@@ -1,16 +1,7 @@
+#include "thermal.h"
 #include <Arduino.h>
 
-#define DUTY_CYCLE_MAX 255
-#define ANALOG_WRITE_FREQUENCY 25000 // 25 kHz for Koolance
-#define FAN_WRITE_FREQ 500
-#define ANALOG_WRITE_RESOLUTION 8 // 8-bit resolution (0-255)
-
-#define PUMP1_PIN 29 // Define the PWM pin for the pump
-#define PUMP2_PIN 28 // Define PWM pin for pump 2
-#define FAN_PIN 7
-
-#define PUMP_THRESHOLD 45 // Temperature threshold in degrees Celsius
-#define FAN_THRESHOLD 50  // Temperature threshold in degrees Celsius
+#define OUTPUT 1
 
 void thermal_forceOff() {
     analogWrite(PUMP1_PIN, 0);
@@ -49,31 +40,64 @@ void thermal_forceOn() {
     analogWrite(FAN_PIN, DUTY_CYCLE_MAX * 0.1);
 }
 
-/*implement */
-void thermal_MCULoop() {
-    // if ((MCU_GetMCU2Data()->mcuTemp <= 0) ||
-    //     (MCU_GetMCU2Data()->motorTemp <= 0) ||
-    //     (MCU_GetMCU2Data()->mcuTemp > 100) ||
-    //     (MCU_GetMCU2Data()->motorTemp > 100)) {
-    //     thermal_forceOn();
-    //     return;
-    // }
+/* Recieves the temperature of both  */
+void thermal_regulate() {
+    static PIDState pump1{0.0, 0.0, 0.0, xTaskGetTickCount()},
+        pump2{0.0, 0.0, 0.0, xTaskGetTickCount()},
+        fan{0.0, 0.0, 0.0, xTaskGetTickCount()};
+    float temp =
+        max(DTI_GetDTIData()->controllerTemp, DTI_GetDTIData()->motorTemp);
+    analogWrite(PUMP1_PIN,
+                DUTY_CYCLE_MAX * computePID(&pump1, PUMP_THRESHOLD, temp,
+                                            PUMP1_PROPORIONAL_GAIN,
+                                            PUMP1_INTEGRAL_GAIN,
+                                            PUMP1_DERIVATIVE_GAIN));
+    analogWrite(PUMP2_PIN,
+                DUTY_CYCLE_MAX * computePID(&pump2, PUMP_THRESHOLD, temp,
+                                            PUMP2_PROPORTIONAL_GAIN,
+                                            PUMP2_INTEGRAL_GAIN,
+                                            PUMP2_DERIVATIVE_GAIN));
+    analogWrite(FAN_PIN, DUTY_CYCLE_MAX * computePID(&fan, FAN_THRESHOLD, temp,
+                                                     FAN_PROPORIONAL_GAIN,
+                                                     FAN_INTEGRAL_GAIN,
+                                                     FAN_DERIVATIVE_GAIN));
+}
 
-    // if (MCU_GetMCU2Data()->mcuTemp > PUMP_THRESHOLD ||
-    //     MCU_GetMCU2Data()->motorTemp > PUMP_THRESHOLD) {
-    //     analogWrite(PUMP1_PIN, DUTY_CYCLE_MAX * 0.9);
-    //     analogWrite(PUMP2_PIN, DUTY_CYCLE_MAX * 0.9);
-    // } else if (MCU_GetMCU2Data()->mcuTemp < PUMP_THRESHOLD - 5 ||
-    //            MCU_GetMCU2Data()->motorTemp < PUMP_THRESHOLD - 5) {
-    //     analogWrite(PUMP1_PIN, 0);
-    //     analogWrite(PUMP2_PIN, 0);
-    // }
-
-    // if (MCU_GetMCU2Data()->mcuTemp > FAN_THRESHOLD ||
-    //     MCU_GetMCU2Data()->motorTemp > FAN_THRESHOLD) {
-    //     analogWrite(FAN_PIN, DUTY_CYCLE_MAX * 0.1);
-    // } else if (MCU_GetMCU2Data()->mcuTemp < FAN_THRESHOLD - 5 ||
-    //            MCU_GetMCU2Data()->motorTemp < FAN_THRESHOLD - 5) {
-    //     analogWrite(FAN_PIN, DUTY_CYCLE_MAX);
-    // }
+float computePID(PIDState *state, float setPoint, float input, float propGain,
+                 float integralGain, float derivativeGain) {
+    TickType_t now = xTaskGetTickCount();
+    float dt = (now - state->lastTime) / (double)configTICK_RATE_HZ; // Convert
+    state->lastTime = now;
+    float error = input - setPoint; // Find the size of error
+    // From here to the end of if statement is not necissary for a general PID
+    // controller
+    if (input < setPoint) {
+        state->integral = error * dt;
+        state->prevError = error;
+        state->prevOutput = 0;
+        return 0;
+    }
+    if (state->prevOutput < 1.0 && state->prevOutput > 0.0)
+        state->integral +=
+            error * dt; // disregard for normal applications of PID
+    float derivative =
+        (error - state->prevError) /
+        dt; // Calculate the derivative of the error (rate of change)
+    float output =
+        propGain * error + integralGain * state->integral +
+        derivativeGain *
+            derivative; // Compute the PID output using the proportional,
+                        // integral, and derivative terms
+    // From here to output = output / MAX_OUTPUT is not necissary for a general
+    // PID controller
+    if (output > MAX_OUTPUT)
+        output = MAX_OUTPUT;
+    if (output < 0)
+        output = 0;
+    output =
+        output /
+        MAX_OUTPUT; // scale output to be between 0 and 1 for PWM duty cycle
+    state->prevOutput = output;
+    state->prevError = error;
+    return output; // Return the computed control output
 }

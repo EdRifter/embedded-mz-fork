@@ -106,8 +106,7 @@ void threadMain(void *pvParameters) {
 #endif
 
         // Bypass_TSSI();
-        // thermal_MCULoop();
-        // thermal_forceOn();
+        // thermal_regulate(); //still need to tune parameters
 
         // if (BSE_GetBSEReading()->bseFront_Reading > BRAKE_LIGHT_THRESHOLD &&
         //     BSE_GetBSEReading()->bseRear_Reading > BRAKE_LIGHT_THRESHOLD) {
