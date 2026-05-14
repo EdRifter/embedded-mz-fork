@@ -46,19 +46,12 @@ typedef struct {
         0.0; // prevOutput is not necessary for a generic PID but is used here
              // to prevent integral windup and can also be used to debug.
     TickType_t lastTime = 0;
-<<<<<<< HEAD
-    } PIDState;
-// To use this PID controller for a different application, create a PID state and follow the comments
-// explaining which lines are necissary for a general PID controller and which are specific to this application.
-float computePID(PIDState* state, float setPoint, float input, float propGain, float integralGain, float derivativeGain);
-=======
 } PIDState;
 // To use this PID controller for a different application, create a PID state
 // and follow the comments explaining which lines are necissary for a general
 // PID controller and which are specific to this application.
-float computePID(PIDState state, float setPoint, float input, float propGain,
+float computePID(PIDState *state, float setPoint, float input, float propGain,
                  float integralGain, float derivativeGain);
->>>>>>> a0eebeaf6abf17253d204665850a9c4addf165b1
 
 /*thermistor based update*/
 void thermal_Update(uint32_t rawReading1, uint32_t rawReading2,

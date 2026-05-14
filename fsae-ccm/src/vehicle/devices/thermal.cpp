@@ -42,11 +42,25 @@ void thermal_forceOn() {
 
 /* Recieves the temperature of both  */
 void thermal_regulate() {
-    static PIDState pump1{0.0, 0.0, 0.0, xTaskGetTickCount()}, pump2{0.0,0.0, 0.0, xTaskGetTickCount()}, fan{0.0,0.0, 0.0, xTaskGetTickCount()};
-    float temp = max(DTI_GetDTIData()->controllerTemp, DTI_GetDTIData() -> motorTemp);
-    analogWrite(PUMP1_PIN, DUTY_CYCLE_MAX * computePID(&pump1, PUMP_THRESHOLD, temp, PUMP1_PROPORIONAL_GAIN, PUMP1_INTEGRAL_GAIN, PUMP1_DERIVATIVE_GAIN)); 
-    analogWrite(PUMP2_PIN, DUTY_CYCLE_MAX * computePID(&pump2, PUMP_THRESHOLD, temp, PUMP2_PROPORTIONAL_GAIN, PUMP2_INTEGRAL_GAIN, PUMP2_DERIVATIVE_GAIN));
-    analogWrite(FAN_PIN, DUTY_CYCLE_MAX * computePID(&fan, FAN_THRESHOLD, temp, FAN_PROPORIONAL_GAIN, FAN_INTEGRAL_GAIN, FAN_DERIVATIVE_GAIN));
+    static PIDState pump1{0.0, 0.0, 0.0, xTaskGetTickCount()},
+        pump2{0.0, 0.0, 0.0, xTaskGetTickCount()},
+        fan{0.0, 0.0, 0.0, xTaskGetTickCount()};
+    float temp =
+        max(DTI_GetDTIData()->controllerTemp, DTI_GetDTIData()->motorTemp);
+    analogWrite(PUMP1_PIN,
+                DUTY_CYCLE_MAX * computePID(&pump1, PUMP_THRESHOLD, temp,
+                                            PUMP1_PROPORIONAL_GAIN,
+                                            PUMP1_INTEGRAL_GAIN,
+                                            PUMP1_DERIVATIVE_GAIN));
+    analogWrite(PUMP2_PIN,
+                DUTY_CYCLE_MAX * computePID(&pump2, PUMP_THRESHOLD, temp,
+                                            PUMP2_PROPORTIONAL_GAIN,
+                                            PUMP2_INTEGRAL_GAIN,
+                                            PUMP2_DERIVATIVE_GAIN));
+    analogWrite(FAN_PIN, DUTY_CYCLE_MAX * computePID(&fan, FAN_THRESHOLD, temp,
+                                                     FAN_PROPORIONAL_GAIN,
+                                                     FAN_INTEGRAL_GAIN,
+                                                     FAN_DERIVATIVE_GAIN));
 }
 
 float computePID(PIDState *state, float setPoint, float input, float propGain,
