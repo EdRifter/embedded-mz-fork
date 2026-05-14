@@ -25,7 +25,9 @@ constexpr float TEMP_MAX = 100.0f;  // Max Temperature, any Temperature greater
 #include "vehicle/devices/bse.h"
 #include "vehicle/devices/dti.h"
 #include "vehicle/devices/rtm.h"
+#include "vehicle/devices/wss.h"
 #include "vehicle/faults.h"
+#include "vehicle/vcu.h"
 #include <arduino_freertos.h>
 
 template <typename T> T constrain(T val, T minVal, T maxVal) {
@@ -73,7 +75,7 @@ void threadVCU(void *pvParameters) {
         float pedalAccel = APPS_GetAPPSReading();
         float pedalBrake = BSE_GetBSEAverage();
         Faults_HandleFaults();
-
+        WSS_Update();
         switch (vehicleState) {
         case STATE_PRECHARGING: /* default state */
             DTI_SendEnableCommand(false);

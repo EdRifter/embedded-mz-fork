@@ -1,8 +1,8 @@
 
-#include <stdint.h>
+#include "arduino_freertos.h"
 #include "vehicle/comms/telemetry.h"
-#include "FreeRTOS.h"
-#include "task.h"
+#include <stdint.h>
+// #include "task.h"
 
 constexpr int DUTY_CYCLE_MAX = 255;
 constexpr int ANALOG_WRITE_FREQUENCY = 25000; // 25 kHz for Koolance
@@ -21,7 +21,8 @@ constexpr float PUMP1_PROPORIONAL_GAIN = 1.0; // tuning parameters for pump PID
 constexpr float PUMP1_INTEGRAL_GAIN = 0.01;
 constexpr float PUMP1_DERIVATIVE_GAIN = 0.1;
 
-constexpr float PUMP2_PROPORTIONAL_GAIN = 1.0; // tuning parameters for pump 2 PID
+constexpr float PUMP2_PROPORTIONAL_GAIN =
+    1.0; // tuning parameters for pump 2 PID
 constexpr float PUMP2_INTEGRAL_GAIN = 0.01;
 constexpr float PUMP2_DERIVATIVE_GAIN = 0.1;
 
@@ -36,16 +37,28 @@ void thermal_regulate();
 void thermal_forceOn();
 void thermal_forceOff();
 
-//PID controller state struct can be used for any PID controller with specified line removed
+// PID controller state struct can be used for any PID controller with specified
+// line removed
 typedef struct {
     float integral = 0.0;
     float prevError = 0.0;
-    float prevOutput = 0.0; //prevOutput is not necessary for a generic PID but is used here to prevent integral windup and can also be used to debug.
+    float prevOutput =
+        0.0; // prevOutput is not necessary for a generic PID but is used here
+             // to prevent integral windup and can also be used to debug.
     TickType_t lastTime = 0;
+<<<<<<< HEAD
     } PIDState;
 // To use this PID controller for a different application, create a PID state and follow the comments
 // explaining which lines are necissary for a general PID controller and which are specific to this application.
 float computePID(PIDState* state, float setPoint, float input, float propGain, float integralGain, float derivativeGain);
+=======
+} PIDState;
+// To use this PID controller for a different application, create a PID state
+// and follow the comments explaining which lines are necissary for a general
+// PID controller and which are specific to this application.
+float computePID(PIDState state, float setPoint, float input, float propGain,
+                 float integralGain, float derivativeGain);
+>>>>>>> a0eebeaf6abf17253d204665850a9c4addf165b1
 
 /*thermistor based update*/
 void thermal_Update(uint32_t rawReading1, uint32_t rawReading2,
