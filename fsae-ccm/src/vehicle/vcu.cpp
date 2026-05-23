@@ -93,7 +93,7 @@ void threadVCU(void *pvParameters) {
             //  mech brakes are engaged
             if (BSE_BrakesPressed()) {
                 if (RTM_ButtonState() && Faults_CheckAllClear()) {
-                    Speaker_Play();  //Play Ready to Drive sound
+                    Speaker_Play(); // Play Ready to Drive sound
                     vehicleState = STATE_DRIVING;
                 }
             } else {
