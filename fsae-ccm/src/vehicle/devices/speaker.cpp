@@ -5,7 +5,7 @@
 void Speaker_Init() { pinMode(speakerPin, OUTPUT); }
 
 void Speaker_Play() {
-    tone(speakerPin, 1300);
-    delay(3000);
+    tone(speakerPin, speakerFrequency);
+    vTaskDelay(pdMS_TO_TICKS(speakerDuration));
     noTone(speakerPin);
 }
