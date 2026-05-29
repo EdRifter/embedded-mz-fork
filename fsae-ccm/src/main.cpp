@@ -17,6 +17,7 @@
 #include "vehicle/devices/bse.h"
 #include "vehicle/devices/linpots.h"
 #include "vehicle/devices/rtm.h"
+#include "vehicle/devices/speaker.h"
 #include "vehicle/devices/thermal.h"
 #include "vehicle/devices/wss.h"
 #include "vehicle/faults.h"
@@ -51,6 +52,7 @@ void setup() { // runs once on bootup
     GPIO_Init();
     WSS_Init();
     WDT_Init();
+    Speaker_Init();
 
     Serial.begin(9600);
 
