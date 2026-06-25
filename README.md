@@ -1,3 +1,5 @@
+My contributions can be found in fsae-pcc (pre charge circuit). Specifically in files: can.cpp, can.h, main.cpp, precharge.cpp, precharge.h
+
 # Architecture
 
 ```mermaid
